@@ -3,82 +3,137 @@ import os
 import asyncio
 from typing import TypedDict
 from langgraph.graph import StateGraph, END
-from langchain_openai import ChatOpenAI
-from browser_use import Agent
 
-# --- 1. CONFIGURATION & ERROR HANDLING ---
-# Safely grab the API key to prevent silent None failures
-groq_key = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
-
-if not groq_key:
-    st.error("🔑 **Groq API Key is missing!** Please set GROQ_API_KEY in your Streamlit secrets or environment variables.")
-    st.stop()
-
-# Using standard ChatOpenAI with Groq's base_url bypassing provider attribute errors
-llm = ChatOpenAI(
-    model="llama-3.3-70b-versatile",
-    api_key=groq_key,
-    openai_api_base="https://api.groq.com/openai/v1"
-)
-
-# Fix for Streamlit's internal loop conflict with asyncio.run()
+# --- DEPENDENCY HANDLING ---
+# Fixes Streamlit's internal loop conflict with running native asyncio runtimes
 try:
     import nest_asyncio
     nest_asyncio.apply()
 except ImportError:
     pass
 
-class Vantagetate(TypedDict):
+# Correct integration drivers for high-performance open-source models via Groq
+from langchain_groq import ChatGroq
+from browser_use import Agent, Browser, BrowserConfig
+
+# --- 1. CONFIGURATION & CORE ENGINE SETUP ---
+groq_key = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
+proxy_url = st.secrets.get("RESIDENTIAL_PROXY_URL") or os.getenv("RESIDENTIAL_PROXY_URL")
+
+if not groq_key:
+    st.error("🔑 **Groq API Key is missing!** Provide it via environment variables or Streamlit secrets.")
+    st.stop()
+
+# Initialize Native ChatGroq LLM
+llm = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    api_key=groq_key
+)
+
+# CRITICAL FIX: Explicit monkeypatch satisfying browser-use's internal validation structural checks
+if not hasattr(llm, "provider"):
+    llm.provider = "groq"
+
+# Configure Browser Automation with Stealth / Proxy configurations if available
+browser_config = BrowserConfig(
+    headless=True,
+    proxy={"server": proxy_url} if proxy_url else None
+)
+browser = Browser(config=browser_config)
+
+# --- 2. STATE GRAPH DEFINITION ---
+class SnyapseState(TypedDict):
     niche: str
     target_url: str
     resume_context: str
     status: str
 
-# --- 2. AGENT LOGIC ---
-async def surgeon_agent(state: Vantagetate):
-    """Surgical tailoring using Groq's high-speed inference."""
-    # Made async to maintain clean execution flow across the graph
-    return {"resume_context": "Deeply engineered technical background in autonomous systems..."}
-
-async def executioner_agent(state: Vantagetate):
-    """Vision-based Stealth Submission via Browser-Use + Groq."""
-    agent = Agent(
-        task=f"Navigate to {state['target_url']}. Fill application with: {state['resume_context']}. Submit.",
-        llm=llm
+# --- 3. AGENT NODE LOGIC ---
+async def surgeon_agent(state: SnyapseState):
+    """
+    Surgeon Agent: Context optimization & Hyper-personalization node.
+    """
+    # Placeholder for RAG lookup & generation logic
+    tailored_bio = (
+        f"Deeply engineered technical background matching target domain: {state['niche']}. "
+        f"Specialized in high-scale systems implementation."
     )
-    # result = await agent.run() # Uncomment to execute live navigation
-    return {"status": "SUCCESS: APPLIED"}
+    return {"resume_context": tailored_bio, "status": "CONTEXT_SYNTHESIZED"}
 
-# --- 3. GRAPH ORCHESTRATION ---
-workflow = StateGraph(Vantagetate)
+async def executioner_agent(state: SnyapseState):
+    """
+    Executioner Agent: Vision-guided orchestration engine using browser-use.
+    """
+    task_instructions = (
+        f"Navigate to {state['target_url']}. "
+        f"Analyze the input form structure. Fill out information fields accurately using data: "
+        f"{state['resume_context']}. Once completely filled out, trigger the submit or continue pipeline."
+    )
+    
+    agent = Agent(
+        task=task_instructions,
+        llm=llm,
+        browser=browser
+    )
+    
+    try:
+        # Run agentic visual navigation 
+        await agent.run()
+        execution_status = "SUCCESS: APPLICATION_EXECUTED"
+    except Exception as browser_err:
+        execution_status = f"FAILED: Browser Execution Interrupted ({str(browser_err)})"
+    finally:
+        await browser.close()
+        
+    return {"status": execution_status}
+
+# --- 4. GRAPH ORCHESTRATION ---
+workflow = StateGraph(SnyapseState)
+
+# Append structural nodes to topology
 workflow.add_node("surgeon", surgeon_agent)
 workflow.add_node("executioner", executioner_agent)
+
+# Set network edges & entry routing
 workflow.set_entry_point("surgeon")
 workflow.add_edge("surgeon", "executioner")
 workflow.add_edge("executioner", END)
+
+# Compile Execution Blueprint
 app = workflow.compile()
 
-# --- 4. STREAMLIT UI ---
-st.set_page_config(page_title="VANTAGE Engine", layout="centered")
-st.title("🚀 VANTAGE: Autonomous Job Engine")
+# --- 5. STREAMLIT INTERFACE LAYER ---
+st.set_page_config(page_title="SNYAPSE FLOW", layout="centered")
+st.title("🚀 SNYAPSE FLOW: Autonomous Swarm Engine")
+st.caption("Stateful, cyclic multi-agent automation platform powered by Groq LPU & Browser-Use.")
 
-niche = st.text_input("Target Role", "Principal Autonomous Systems Engineer")
-url = st.text_input("Job URL", "https://careers.company.com/job-id")
+niche = st.text_input("Target Domain / Role", "Principal Autonomous Systems Engineer")
+url = st.text_input("Target Application URL", "https://careers.company.com/job-id")
 
 if st.button("Engage Swarm"):
-    with st.spinner("VANTAGE is hunting..."):
-        try:
-            # Safely fetch or create the running event loop to avoid conflict with Streamlit
+    if not url or url == "https://careers.company.com/job-id":
+        st.warning("Please provide a valid Target Application URL.")
+    else:
+        with st.spinner("SNYAPSE swarm vectors hunting context..."):
             try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
+                # Thread Loop Management within Streamlit architecture context
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    
+                # Run Multi-Agent Blueprint asynchronously
+                initial_state = {"niche": niche, "target_url": url, "resume_context": "", "status": "INIT"}
+                result = loop.run_until_complete(app.ainvoke(initial_state))
                 
-            # Running the async Graph execution safely inside Streamlit
-            result = loop.run_until_complete(app.ainvoke({"niche": niche, "target_url": url}))
-            
-            st.success(f"Final Status: {result.get('status', 'COMPLETED')}")
-            st.balloons()
-        except Exception as e:
-            st.error(f"Engine Failure: {e}")
+                # Interface telemetry output
+                final_status = result.get("status", "COMPLETED")
+                if "SUCCESS" in final_status:
+                    st.success(f"Execution Target Reached: {final_status}")
+                    st.balloons()
+                else:
+                    st.error(f"Execution Log: {final_status}")
+                    
+            except Exception as e:
+                st.error(f"Swarm Fatal Engine Failure: {e}")
