@@ -1,0 +1,22 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.env
+
+# --- Project Specific ---
+.cache/
+.streamlit/
+*.log
+.DS_Store
+
+# --- Secrets (NEVER COMMIT) ---
+.env
+api_keys.json
+credentials.json
+
+# --- Browser Data ---
+playwright-data/
+browser_screenshots/
