@@ -24,19 +24,19 @@ if not groq_key:
     st.stop()
 
 # Initialize Groq via standard OpenAI-compatible client wrapper
-# This satisfies the structural and field-level validation checks of browser-use natively
 llm = ChatOpenAI(
     model="llama-3.3-70b-versatile",
     api_key=groq_key,
     base_url="https://api.groq.com/openai/v1"
 )
 
-# Configure Browser Automation with Proxy configurations if available
-browser_config = BrowserConfig(
-    headless=True,
-    proxy={"server": proxy_url} if proxy_url else None
-)
-browser = Browser(config=browser_config)
+# Leverage Streamlit Session State to persist the browser engine safely across user clicks
+if "browser_instance" not in st.session_state:
+    browser_config = BrowserConfig(
+        headless=True,
+        proxy={"server": proxy_url} if proxy_url else None
+    )
+    st.session_state.browser_instance = Browser(config=browser_config)
 
 # --- 2. STATE GRAPH DEFINITION ---
 class SnyapseState(TypedDict):
@@ -66,10 +66,13 @@ async def executioner_agent(state: SnyapseState):
         f"{state['resume_context']}. Once completely filled out, trigger the submit or continue pipeline."
     )
     
+    # Extract persistent instance
+    active_browser = st.session_state.browser_instance
+    
     agent = Agent(
         task=task_instructions,
         llm=llm,
-        browser=browser
+        browser=active_browser
     )
     
     try:
@@ -78,8 +81,7 @@ async def executioner_agent(state: SnyapseState):
         execution_status = "SUCCESS: APPLICATION_EXECUTED"
     except Exception as browser_err:
         execution_status = f"FAILED: Browser Execution Interrupted ({str(browser_err)})"
-    finally:
-        await browser.close()
+    # REMOVED browser.close() to keep instance alive for subsequent runs
         
     return {"status": execution_status}
 
@@ -99,8 +101,8 @@ workflow.add_edge("executioner", END)
 app = workflow.compile()
 
 # --- 5. STREAMLIT INTERFACE LAYER ---
-st.set_page_config(page_title="SNYAPSE FLOW", layout="centered")
-st.title("🚀 SNYAPSE FLOW: Autonomous Swarm Engine")
+st.set_page_config(page_title="SYNAPSE FLOW", layout="centered")
+st.title("🚀 SYNAPSE FLOW: Autonomous Swarm Engine")
 st.caption("Stateful, multi-agent automation platform powered by Groq LPU & Browser-Use.")
 
 niche = st.text_input("Target Domain / Role", "Principal Autonomous Systems Engineer")
@@ -110,7 +112,7 @@ if st.button("Engage Swarm"):
     if not url or url == "https://careers.company.com/job-id":
         st.warning("Please provide a valid Target Application URL.")
     else:
-        with st.spinner("SNYAPSE swarm vectors hunting context..."):
+        with st.spinner("SYNAPSE swarm vectors hunting context..."):
             try:
                 # Thread Loop Management within Streamlit architecture context
                 try:
