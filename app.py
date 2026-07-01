@@ -5,15 +5,14 @@ from typing import TypedDict
 from langgraph.graph import StateGraph, END
 
 # --- DEPENDENCY HANDLING ---
-# Fixes Streamlit's internal loop conflict with running native asyncio runtimes
+# Patches Streamlit's runtime to handle nested async execution loops safely
 try:
     import nest_asyncio
     nest_asyncio.apply()
 except ImportError:
     pass
 
-# Correct integration drivers for high-performance open-source models via Groq
-from langchain_groq import ChatGroq
+from langchain_openai import ChatOpenAI
 from browser_use import Agent, Browser, BrowserConfig
 
 # --- 1. CONFIGURATION & CORE ENGINE SETUP ---
@@ -24,17 +23,15 @@ if not groq_key:
     st.error("🔑 **Groq API Key is missing!** Provide it via environment variables or Streamlit secrets.")
     st.stop()
 
-# Initialize Native ChatGroq LLM
-llm = ChatGroq(
+# Initialize Groq via standard OpenAI-compatible client wrapper
+# This satisfies the structural and field-level validation checks of browser-use natively
+llm = ChatOpenAI(
     model="llama-3.3-70b-versatile",
-    api_key=groq_key
+    api_key=groq_key,
+    base_url="https://api.groq.com/openai/v1"
 )
 
-# CRITICAL FIX: Explicit monkeypatch satisfying browser-use's internal validation structural checks
-if not hasattr(llm, "provider"):
-    llm.provider = "groq"
-
-# Configure Browser Automation with Stealth / Proxy configurations if available
+# Configure Browser Automation with Proxy configurations if available
 browser_config = BrowserConfig(
     headless=True,
     proxy={"server": proxy_url} if proxy_url else None
@@ -53,7 +50,6 @@ async def surgeon_agent(state: SnyapseState):
     """
     Surgeon Agent: Context optimization & Hyper-personalization node.
     """
-    # Placeholder for RAG lookup & generation logic
     tailored_bio = (
         f"Deeply engineered technical background matching target domain: {state['niche']}. "
         f"Specialized in high-scale systems implementation."
@@ -105,7 +101,7 @@ app = workflow.compile()
 # --- 5. STREAMLIT INTERFACE LAYER ---
 st.set_page_config(page_title="SNYAPSE FLOW", layout="centered")
 st.title("🚀 SNYAPSE FLOW: Autonomous Swarm Engine")
-st.caption("Stateful, cyclic multi-agent automation platform powered by Groq LPU & Browser-Use.")
+st.caption("Stateful, multi-agent automation platform powered by Groq LPU & Browser-Use.")
 
 niche = st.text_input("Target Domain / Role", "Principal Autonomous Systems Engineer")
 url = st.text_input("Target Application URL", "https://careers.company.com/job-id")
