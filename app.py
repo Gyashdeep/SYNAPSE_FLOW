@@ -23,7 +23,10 @@ if not groq_key:
     st.error("🔑 **Groq API Key is missing!** Provide it via environment variables or Streamlit secrets.")
     st.stop()
 
-# Initialize Groq via standard OpenAI-compatible client wrapper
+# Force standard environment key so underlying sub-agents don't throw validation loops
+os.environ["OPENAI_API_KEY"] = groq_key
+
+# Initialize Groq via standard OpenAI-compatible client wrapper to bypass provider typechecks
 llm = ChatOpenAI(
     model="llama-3.3-70b-versatile",
     api_key=groq_key,
@@ -81,7 +84,6 @@ async def executioner_agent(state: SnyapseState):
         execution_status = "SUCCESS: APPLICATION_EXECUTED"
     except Exception as browser_err:
         execution_status = f"FAILED: Browser Execution Interrupted ({str(browser_err)})"
-    # REMOVED browser.close() to keep instance alive for subsequent runs
         
     return {"status": execution_status}
 
@@ -114,15 +116,17 @@ if st.button("Engage Swarm"):
     else:
         with st.spinner("SYNAPSE swarm vectors hunting context..."):
             try:
-                # Thread Loop Management within Streamlit architecture context
+                # Execution wrapper to resolve Streamlit's event loop contention
+                initial_state = {"niche": niche, "target_url": url, "resume_context": "", "status": "INIT"}
+                
                 try:
-                    loop = asyncio.get_running_loop()
+                    # Capture existing runtime loop safely managed by Streamlit thread execution
+                    loop = asyncio.get_event_loop()
                 except RuntimeError:
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
-                    
-                # Run Multi-Agent Blueprint asynchronously
-                initial_state = {"niche": niche, "target_url": url, "resume_context": "", "status": "INIT"}
+                
+                # Execute compiled Graph graph schema via thread-safe handler or direct loop control
                 result = loop.run_until_complete(app.ainvoke(initial_state))
                 
                 # Interface telemetry output
